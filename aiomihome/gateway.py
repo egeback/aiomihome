@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import socket
-import struct
+#import struct
 import json
 import functools
 
@@ -10,68 +10,14 @@ from asyncio import Queue
 from collections import defaultdict
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
+from .helpers import _list2map, encode_light_rgb, decode_light_rgb
 
-BROADCAST_PORT = 9898
-BROADCAST_ADDR = "224.0.0.50"
-#BROADCAST_ADDR = "ff0e::10"
+
+GATEWAY_DISCOVERY_PORT = 4321
 _LOGGER = logging.getLogger(__name__)
 
 
-# class Result(object):
-#     def __init__(self, command,  future):
-#         self.command = command
-#         self.future = future
-
-class MyHomeServerProtocol(asyncio.DatagramProtocol):
-    def __init__(self, gateways):
-        super().__init__()
-        self.results = []
-        self.hub_discovery_future = None
-        self.futures = {}
-        self.gateways = gateways
-        self.transport = None
-
-    
-    #def discovery_future(self, future):
-    #    self.discovery_future = future
-
-    def connection_made(self, transport):
-        self.transport = transport
-
-    def datagram_received(self, data, addr):
-        if len(data) is not None:
-            resp = json.loads(data.decode())
-
-            cmd = resp['cmd']
-
-            if cmd == 'heartbeat':
-                print('Got heartbeat {!r} from {!r}'.format(data, addr))
-            elif cmd == "iam":
-                print('Got iam {!r} from {!r}'.format(data, addr))
-                self.gateways._whois_queue.put_nowait(resp)
-                # if self.hub_discovery_future is not None and not self.hub_discovery_future.done():
-                #    self.hub_discovery_future.set_result(resp)
-
-                    
-                return
-            else:
-                print('Received {!r} from {!r}'.format(data, addr))
-            data = "I received {!r}".format(data).encode("ascii")
-
-        #print('Send {!r} to {!r}'.format(data, addr))
-        #self.transport.sendto(data, addr)
-    
-    # def add_future(self, command, future):
-    #     self.callbaresultscks.append(Result(command, fulture))
-
-    # def set_hub_discovery_future(self, future):
-    #    self.hub_discovery_future = future
-
-    #def add_device_callback():
-    #    pass
-
-
-class MyHomeDeviceProtocol(asyncio.DatagramProtocol):
+class MiHomeDeviceProtocol(asyncio.DatagramProtocol):
     def __init__(self, gateway):
         super().__init__()
         self.gateway = gateway
@@ -80,89 +26,14 @@ class MyHomeDeviceProtocol(asyncio.DatagramProtocol):
         self.transport = transport
     
     def datagram_received(self, data, addr):
-        print('Received {!r} from {!r}'.format(data, addr))
+        _LOGGER.debug('Received {!r} from {!r}'.format(data, addr))
         if len(data) is not None:
-            resp = json.loads(data.decode())
+            resp = json.loads(data.decode("ascii"))
 
             self.gateway._queue.put_nowait(resp)
-        
 
-class MyHomeGateways(object):
-    def __init__(self, loop=asyncio.get_event_loop()):
-        self._loop = loop
-        self._multicast_socket = None
-        self._transport = None
-        self._protocol = None
-        self._socket = None
-        self._gateways = {}
-        self._whois_queue = Queue()
-
-    async def discover(self) -> None:
-        if self._transport is None or self._socket is None:
-            await self._listen()
-        
-        print("Send whois")
-
-        # self._socket.sendto('{"cmd":"whois"}'.encode(), ('224.0.0.50' , 4321))
-        self._transport.sendto('{"cmd":"whois"}'.encode(), ('224.0.0.50' , 4321))
-
-        try:
-            while True:
-                gateway = await asyncio.wait_for(self._get_gateway(), 5)
-                self._gateways[gateway.ip_adress] = gateway
-                await gateway.listen()
-        except asyncio.TimeoutError:
-            _LOGGER.debug("Gateway discovery finished in 5 seconds")
-        
-        _LOGGER.debug("Found %i gatways. %s", len(self._gateways), list(self._gateways.keys()))
-    
-    async def _get_gateway(self):
-        result = await self._whois_queue.get()
-
-        return MyHomeGateway(result['ip'], int(result['port']), result['sid'], None, self._loop)
-
-    async def _get_gateway2(self):
-        future = Future()
-        self._protocol.set_hub_discovery_future(future)
-        await asyncio.wait_for(future, 5)
-        result = future.result()
-        # {"cmd":"iam","port":"9898","sid":"7811dcb07917","model":"gateway","proto_version":"1.1.2","ip":"10.0.4.104"}' from ('10.0.4.104', 4321)
-        # print(result))
-
-        return MyHomeGateway(result['ip'], int(result['port']), result['sid'], None, self._loop)
-    
-    async def _listen(self) -> None:
-        print("listen")
-        
-        self._socket = self._create_multcast_socket()
-        listen = self._loop.create_datagram_endpoint(
-            functools.partial(MyHomeServerProtocol, self),
-            sock=self._socket,
-        )
-
-        self._transport, self._protocol = await listen
-
-    def _create_multcast_socket(self):
-        addrinfo = socket.getaddrinfo(BROADCAST_ADDR, None)[0]
-        sock = socket.socket(addrinfo[0], socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        group_bin = socket.inet_pton(addrinfo[0], addrinfo[4][0])
-        
-        if addrinfo[0] == socket.AF_INET: # IPv4
-            sock.bind(('', BROADCAST_PORT))
-            mreq = group_bin + struct.pack('=I', socket.INADDR_ANY)
-            sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-        else:
-            sock.bind(('', BROADCAST_PORT))
-            mreq = group_bin + struct.pack('@I', 0)
-            sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
-        
-        return sock
-
-
-class MyHomeGateway(object):
-    def __init__(self, ip_adress, port, sid, key, porto=None, loop=asyncio.get_event_loop()):
+class MiHomeGateway(object):
+    def __init__(self, ip_adress, port, sid, key, porto=None, loop=asyncio.get_event_loop(), host=None):
         self.ip_adress = ip_adress
         self.port = port
         self.sid = sid
@@ -174,42 +45,52 @@ class MyHomeGateway(object):
         self._socket = None
         self._token = None
         self.devices = defaultdict(list)
+        self.callbacks = defaultdict(list)
+        self.host = host
+        self.heartbeat_callback = None
+        self.device_callback = None
+
+        self.brightness = -1
+        self.color = -1
+        self.illumination = -1
+        self.rgb = -1
 
     async def listen(self) -> None:
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         listen = self._loop.create_datagram_endpoint(
-            functools.partial(MyHomeDeviceProtocol, self),
+            functools.partial(MiHomeDeviceProtocol, self),
             sock=self._socket,
         )
 
         self._transport, self._protocol = await listen
 
         if self.proto is None:
-            cmd = '{"cmd":"read","sid":"' + sid + '"}'
-            resp = self._send_command(cmd)
+            cmd = '{"cmd":"read","sid":"' + self.sid + '"}'
+            resp = await self._send_command(cmd)
             self.proto = _get_value(resp, "proto_version") if _validate_data(resp) else None
+
         self.proto = '1.0' if self.proto is None else self.proto
 
-        await self._discover_devices()
+        trycount = 5
+        for _ in range(trycount):
+            _LOGGER.info('Discovering Xiaomi Devices')
+            if  await self._discover_devices():
+                break
+    
+    def close(self):
+        _LOGGER.debug("Closing Gateway")
+        self._transport.close()
+        self._socket.close()
 
     async def _discover_devices(self) -> None:
-        # await asyncio.sleep(1)
-        # print("discovery")
-        # self.sock.sendto('{"cmd":"discovery"}'.encode(), ('10.0.4.104' , 9898))
-        # await asyncio.sleep(1)
-        # print("Send get_id_list")
-        # self._socket.sendto('{"cmd" : "get_id_list"}'.encode(), ('10.0.4.104' , 9898))
-        # await asyncio.sleep(1)
-        # self._socket.sendto('{"cmd":"whois"}'.encode(), ('224.0.0.50' , 4321))
-        # result = self.protocol.add_future("")
-
         command = '{"cmd" : "get_id_list"}'
         resp = await self._send_command(command, "get_id_list_ack")
-        
-        print(resp)
 
-        self.token = resp['token']
+        if resp is None or "token" not in resp or ("data" not in resp and "dev_list" not in resp):
+            return False
+
+        self._token = resp['token']
         sids = []
 
         sids = json.loads(resp["data"])
@@ -251,7 +132,8 @@ class MyHomeGateway(object):
             model = resp["model"]
             supported = False
 
-            print(model)
+            if resp["sid"] == self.sid:
+                self.decode_data(resp)
 
             for device_type in device_types:
                 if model in device_types[device_type]:
@@ -266,25 +148,27 @@ class MyHomeGateway(object):
                     self.devices[device_type].append(xiaomi_device)
                     _LOGGER.debug('Registering device %s, %s as: %s', sid, model, device_type)
 
-            for device_type in device_types:
-                if model in device_types[device_type]:
-                    xiaomi_device = {
-                        "model": model,
-                        "proto": self.proto,
-                        "sid": resp["sid"],
-                        "short_id": resp["short_id"] if "short_id" in resp else 0,
-                        "data": _list2map(_get_value(resp)),
-                        "raw_data": resp}
-                    self.devices[device_type].append(xiaomi_device)
-                    _LOGGER.debug('Registering device %s, %s as: %s', sid, model, device_type)
-        
+            if not supported:
+                if model:
+                    _LOGGER.error(
+                        'Unsupported device found! %s', resp)
+                else:
+                    _LOGGER.error(
+                        'The device with sid %s isn\'t supported of the used '
+                        'gateway firmware. Please update the gateway firmware if '
+                        'possible! This is the only way the issue can be solved.',
+                        resp["sid"])
+
+                continue        
         return True
 
-    async def _send_command(self, command, return_for_command):
+    async def _send_command(self, command, return_for_command=None):
         _LOGGER.debug("_send_cmd >> '%s' to: %s:%s", command.encode(), self.ip_adress, self.port)
 
         self._transport.sendto(command.encode(), (self.ip_adress, self.port))
 
+        if return_for_command is None:
+            return None
         try:
             resp = await asyncio.wait_for(self._queue.get(), 10)
             _LOGGER.debug("_send_cmd resp << %s", resp)
@@ -296,8 +180,13 @@ class MyHomeGateway(object):
 
         except asyncio.TimeoutError:
             _LOGGER.error("No response from Gateway")
+        
+        return None
     
-    async def write_to_gateway(self, sid, **kwargs):
+    async def send_cmd(self, **kwargs):
+        return await self._write_data(self.sid, **kwargs)
+    
+    async def _write_data(self, sid, **kwargs):
         """Send data to gateway to turn on / off device"""
         if self.key is None:
             _LOGGER.error('Gateway Key is not provided. Can not send commands to the gateway.')
@@ -305,19 +194,18 @@ class MyHomeGateway(object):
         data = {}
         for key in kwargs:
             data[key] = kwargs[key]
-        if not self.token:
+        if not self._token:
             _LOGGER.debug('Gateway Token was not obtained yet. Cannot send commands to the gateway.')
             return False
         
         cmd = dict()
         cmd['cmd'] = 'write'
         cmd['sid'] = sid
-        
+
         data['key'] = self._get_key()
         cmd['data'] = data
 
-        resp = self._send_cmd(json.dumps(cmd), "write_ack") if int(self.proto[0:1]) == 1 \
-            else self._send_cmd(json.dumps(cmd), "write_rsp")
+        resp = await self._send_command(json.dumps(cmd), "write_ack")
         _LOGGER.debug("write_ack << %s", resp)
         if _validate_data(resp):
             return True
@@ -325,24 +213,24 @@ class MyHomeGateway(object):
             return False
 
         # If 'invalid key' message we ask for a new token
-        resp = self._send_command('{"cmd" : "get_id_list"}', "get_id_list_ack") 
+        resp = await self._send_command('{"cmd" : "get_id_list"}', "get_id_list_ack") 
 
         _LOGGER.debug("get_id_list << %s", resp)
 
         if resp is None or "token" not in resp:
             _LOGGER.error('No new token from gateway. Can not send commands to the gateway.')
             return False
-        self.token = resp['token']
+        self._token = resp['token']
 
         data['key'] = self._get_key()
         cmd['data'] = data
 
-        resp = self._send_cmd(json.dumps(cmd), "write_ack")
+        resp = await self._send_command(json.dumps(cmd), "write_ack")
 
         _LOGGER.debug("write_ack << %s", resp)
         return _validate_data(resp)
     
-    def get_from_gateway(self, sid):
+    def get_data(self, sid):
         """Get data from gateway"""
         cmd = '{ "cmd":"read","sid":"' + sid + '"}'
         resp = self._send_command(cmd, "read_ack")
@@ -366,10 +254,41 @@ class MyHomeGateway(object):
         init_vector = bytes(bytearray.fromhex('17996d093d28ddb3ba695a2e6f58562e'))
         encryptor = Cipher(algorithms.AES(self.key.encode()), modes.CBC(init_vector),
                            backend=default_backend()).encryptor()
-        ciphertext = encryptor.update(self.token.encode()) + encryptor.finalize()
+        ciphertext = encryptor.update(self._token.encode()) + encryptor.finalize()
         if isinstance(ciphertext, str):  # For Python 2 compatibility
             return ''.join('{:02x}'.format(ord(x)) for x in ciphertext)
         return ''.join('{:02x}'.format(x) for x in ciphertext)
+
+    async def set_color(self, r, g, b, brightness=-1):
+        if brightness > 0:
+            await self.send_cmd(**{"rgb": encode_light_rgb(brightness, r, b , b)})
+        else:
+            await self.send_cmd(**{"rgb": encode_light_rgb(self.brightness, r, g , b)})
+    
+    async def turn_off_light(self):
+        await self.send_cmd(**{"rgb": 0})
+    
+    def decode_data(self, data):
+        if isinstance(data, str):
+            j_data = json.loads(data)
+        elif isinstance(data, list):
+            j_data = _list2map(_get_value(data))
+        else:
+            j_data = data
+        
+        if "data" in j_data:
+            j_data = j_data["data"]
+            if isinstance(j_data, str):
+                j_data = json.loads(j_data)
+        
+        if "illumination" in j_data:
+            self.illumination = j_data.get("illumination")
+        if "rgb" in j_data:
+            self.rgb = j_data.get("rgb")
+            c = decode_light_rgb(j_data.get("rgb"))
+            brightness = c["brightness"]
+            del c["brightness"]
+            self.color = c
 
 
 def _validate_data(data):
@@ -377,12 +296,12 @@ def _validate_data(data):
         _LOGGER.error('No data in response from hub %s', data)
         return False
     if "data" in data and 'error' in json.loads(data['data']):
-        _LOGGER.error('Got error element in data %s', data['data'])
+        _LOGGER.error("Got error element in data %s, full data: '%s'", data['data'], data)
         return False
     if "params" in data:
         for param in data['params']:
             if 'error' in param:
-                _LOGGER.error('Got error element in data %s', data['params'])
+                _LOGGER.error("Got error element in data %s, full data: '%s'", data['params'], data)
                 return False
     return True
 
@@ -402,6 +321,11 @@ def _get_value(resp, data_key=None):
         return None
     data = json.loads(resp["data"]) if "data" in resp else resp["params"]
     if data_key is None:
+        if isinstance(data, dict):
+            new_data = {}
+            for key, value in data.items():
+                new_data[key] = parse_data(key, value)
+            return new_data
         return data
     if isinstance(data, list):
         for param in data:
@@ -410,13 +334,27 @@ def _get_value(resp, data_key=None):
         return None
     return data.get(data_key)
 
-
-def _list2map(data):
-    if not isinstance(data, list):
-        return data
-    new_data = {}
-    for obj in data:
-        for key in obj:
-            new_data[key] = obj[key]
-    new_data['raw_data'] = data
-    return new_data
+def parse_data(value_key, value):
+    """Parse data sent by gateway."""
+    if value is None:
+        return False
+    if value_key in ["coordination", "status", "proto", "proto_version"]:
+        return value
+    
+    value = float(value)
+    if value_key in ["temperature", "humidity", "pressure"]:
+        value /= 100
+    elif value_key in ["illumination"]:
+        value = max(value - 300, 0)
+    if value_key == "temperature" and (value < -50 or value > 60):
+        return False
+    if value_key == "humidity" and (value <= 0 or value > 100):
+        return False
+    if value_key == "pressure" and value == 0:
+        return False
+    if value_key in ["illumination", "lux"]:
+        return round(value)
+    else:
+        return round(value, 1)
+    
+    return value
