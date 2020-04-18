@@ -7,7 +7,7 @@ import struct
 
 from asyncio import Queue
 from .gateway import MiHomeGateway
-from .helpers import run_callback, log_traceback
+from .helpers import run_callback
 
 _LOGGER = logging.getLogger(__name__)
 MULTICAST_PORT = 9898
@@ -94,7 +94,7 @@ class XiaomiService(object):
             port = gateway.get('port')
             sid = gateway.get('sid')
 
-            if not (host and port and sid):
+            if not (host and port):
                 continue
 
             try:
@@ -108,9 +108,13 @@ class XiaomiService(object):
                     'Xiaomi Gateway %s configured at IP %s:%s',
                     sid, ip_address, port)
 
-                self.gateways[ip_address] = MiHomeGateway(
-                    ip_address, port, sid,
-                    gateway.get('key'), gateway.get('proto'))
+                # self.gateways[ip_address] = MiHomeGateway(
+                #    ip_address, port, sid,
+                #    gateway.get('key'), gateway.get('proto'))
+
+                if not port:
+                    gateway['port'] = 9898
+
                 gateway['ip_address'] = ip_address
             except OSError as error:
                 _LOGGER.error(
@@ -130,17 +134,23 @@ class XiaomiService(object):
                 disabled = False
                 for gw in self._gateways_config:
                     sid = gw.get('sid')
-                    if sid is None or sid == gateway.sid:
+                    ip_address = gw.get('ip_address')
+                    if (sid is None and ip_address is None) or sid == gateway.sid:
+                        gateway.key = gw.get('key')
+                    elif ip_address is not None and ip_address == gateway.ip_address:
                         gateway.key = gw.get('key')
                     if sid and sid == gateway.sid and gw.get('disable'):
                         disabled = True
+                    elif ip_address and ip_address == gateway.ip_address and gw.get('disable'):
+                        disabled = True
+                    
 
                 if disabled:
                     _LOGGER.info("Xiaomi Gateway %s is disabled by configuration", sid)
                     self.disabled_gateways.append(gateway.ip_adress)
                 else:
-                    _LOGGER.info('Xiaomi Gateway %s found at IP %s', gateway.sid, gateway.ip_adress)
-                    self.gateways[gateway.ip_adress] = gateway
+                    _LOGGER.info('Xiaomi Gateway %s found at IP %s', gateway.sid, gateway.ip_address)
+                    self.gateways[gateway.ip_address] = gateway
                     await gateway.listen()
 
         except asyncio.TimeoutError:

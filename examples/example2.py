@@ -21,16 +21,16 @@ async def device_callback(data):
     print("Device data RECIVED", data)
 
 async def start(key):
-    service = XiaomiService(gateways_config=[{"host": "10.0.4.104", "sid": "7811dcb07917", "port": 9898, "key": key}])
-    
-    # gateways = await service.discover()
-    # gateway = gateways[0]
-    # gateway.heartbeat_callback = heartbeat_callback
-    # gateway.device_callback = device_callback
-    # print("Number of gateways found: {}".format(len(gateways)))
-    
+    # service = XiaomiService(gateways_config=[{"host": "10.0.4.104", "sid": "7811dcb07917", "port": 9898, "key": key}])
+    service = XiaomiService(gateways_config=[{"host": "10.0.4.104", "port": 9898, "key": key}])
+    #service = XiaomiService(gateways_config=[{"key": key}])
     await service.listen()
-    gateway = await service.add_gateway("10.0.4.104", 9898, "7811dcb07917", key)
+    
+    gateways = await service.discover()
+    gateway = gateways[0]
+    print("Number of gateways found: {}".format(len(gateways)))
+
+    #gateway = await service.add_gateway("10.0.4.104", 9898, "7811dcb07917", key)
 
     gateway.heartbeat_callback = heartbeat_callback
     gateway.device_callback = device_callback
@@ -72,7 +72,7 @@ async def light_show(gateway):
 def main(key):
     loop = asyncio.get_event_loop()
     #loop.set_debug(True)
-    #logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
     #logging.basicConfig(level=logging.INFO)
     try:
         loop.run_until_complete(start(key))

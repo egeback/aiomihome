@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import socket
-#import struct
 import json
 import functools
 
@@ -33,8 +32,8 @@ class MiHomeDeviceProtocol(asyncio.DatagramProtocol):
             self.gateway._queue.put_nowait(resp)
 
 class MiHomeGateway(object):
-    def __init__(self, ip_adress, port, sid, key, porto=None, loop=asyncio.get_event_loop(), host=None):
-        self.ip_adress = ip_adress
+    def __init__(self,address, port, sid, key, porto=None, loop=asyncio.get_event_loop(), host=None):
+        self.ip_address = address
         self.port = port
         self.sid = sid
         self.key = key
@@ -163,9 +162,9 @@ class MiHomeGateway(object):
         return True
 
     async def _send_command(self, command, return_for_command=None):
-        _LOGGER.debug("_send_cmd >> '%s' to: %s:%s", command.encode(), self.ip_adress, self.port)
+        _LOGGER.debug("_send_cmd >> '%s' to: %s:%s", command.encode(), self.ip_address,  self.port)
 
-        self._transport.sendto(command.encode(), (self.ip_adress, self.port))
+        self._transport.sendto(command.encode(), (self.ip_address,  self.port))
 
         if return_for_command is None:
             return None
