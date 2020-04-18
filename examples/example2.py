@@ -22,6 +22,7 @@ async def device_callback(data):
 
 async def start(key):
     service = XiaomiService(gateways_config=[{"host": "10.0.4.104", "sid": "7811dcb07917", "port": 9898, "key": key}])
+    
     # gateways = await service.discover()
     # gateway = gateways[0]
     # gateway.heartbeat_callback = heartbeat_callback
@@ -30,30 +31,24 @@ async def start(key):
     
     await service.listen()
     gateway = await service.add_gateway("10.0.4.104", 9898, "7811dcb07917", key)
-    # gateways = [MiHomeGateway("10.0.4.104", 9898, "7811dcb07917", "3B3BB5D83AAF4CA3", "1.1.2", service.loop)]
-    # service.gateways["10.0.4.104"] = gateways[0]
 
-    # gateway.heartbeat_callback = heartbeat_callback
+    gateway.heartbeat_callback = heartbeat_callback
     gateway.device_callback = device_callback
-    # await gateway.listen()
 
     try:
         print("Turn on light")
-        # await gateway.write_data(gateway.sid, **{"rgb": 1107361536})
-        #await gateway.write_data(gateway.sid, **{"rgb": 0, "illumination": 351})
         for device_type, devices in gateway.devices.items():
             print(device_type, len(devices))
             for device in devices:
                 print("     ", device['model'])
                 for value_key, value in device['data'].items():
-                    print("         ", value_key, value) #parse_data(value_key, value))
+                    print("         ", value_key, value)
         #await gateway.send_cmd(**{"mid": 11, "vol": 50})
         await light_show(gateway)
         print("Wait 10 sec")
         await asyncio.sleep(10)
         print("Start again")
-        #await light_show(gateway)
-        await gateway.set_color(0, 0, 255)
+        await light_show(gateway)
         print("Wait 10 sec")
         await asyncio.sleep(10)
         await gateway.turn_off_light()
@@ -66,19 +61,13 @@ async def light_show(gateway):
         await gateway.send_cmd(**{"rgb": 65929471})
         await asyncio.sleep(1)
         await gateway.set_color(255, 0, 0)
-        #await gateway.send_cmd(**{"rgb": encode_light_rgb(255, 255, 0 ,0)})
         await asyncio.sleep(1)
         await gateway.set_color(0, 255, 0)
-        #await gateway.send_cmd(**{"rgb": encode_light_rgb(255, 0, 255 ,0)})
         await asyncio.sleep(1)
         await gateway.set_color(0, 0, 255)
-        #await gateway.send_cmd(**{"rgb": encode_light_rgb(255, 0, 0 ,255)})
         await asyncio.sleep(1)
         print("Turn off light")
-        #await gateway.send_cmd(**{"rgb": 0})
         await gateway.turn_off_light()
-
-        #`{"cmd": "write", "model": "gateway", "sid": "${this._sid}", "short_id": 0, "data": "{\\"mid\\":${this._sound}, \\"vol\\":${this._volume}, \\"key\\": \\"${this._key}\\"}"}`
 
 def main(key):
     loop = asyncio.get_event_loop()

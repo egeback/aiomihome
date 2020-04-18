@@ -1,4 +1,5 @@
 import sys
+import re
 import asyncio
 import logging
 
@@ -15,7 +16,7 @@ from aiomihome.helpers import encode_light_rgb
 def main(key):
     loop = asyncio.get_event_loop()
 
-    loop.set_debug(True)
+    #loop.set_debug(True)
     logging.basicConfig(level=logging.DEBUG)
 
     myhome = XiaomiService(gateways_config = [{'key': key}],loop=loop)
@@ -34,7 +35,7 @@ def main(key):
 
         if light is not None:
             #loop.run_until_complete(gateway.write_data(device['sid'], **{'rgb': 1694451968}))
-            loop.run_until_complete(gateway.write_data(device['sid'], **{'rgb': encode_light_rgb(10, 255,0,0)}))
+            loop.run_until_complete(gateway._write_data(device['sid'], **{'rgb': encode_light_rgb(10, 255,0,0)}))
 
         loop.run_forever()
         

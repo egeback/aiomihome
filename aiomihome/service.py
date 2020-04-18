@@ -7,7 +7,7 @@ import struct
 
 from asyncio import Queue
 from .gateway import MiHomeGateway
-from .helpers import run_callback
+from .helpers import run_callback, log_traceback
 
 _LOGGER = logging.getLogger(__name__)
 MULTICAST_PORT = 9898
@@ -29,36 +29,39 @@ class MiHomeServerProtocol(asyncio.DatagramProtocol):
         self.transport = transport
 
     def datagram_received(self, data, addr):
-        if len(data) is not None:
-            resp = json.loads(data.decode("ascii"))
+        try:
+            if len(data) is not None:
+                resp = json.loads(data.decode("ascii"))
 
-            cmd = resp['cmd']
+                cmd = resp['cmd']
 
-            if cmd == 'heartbeat':
-                _LOGGER.debug('Got heartbeat {!r} from {!r}'.format(data, addr))
-                for gateway in self.discovery_service.gateways.values():
-                    if gateway.sid == resp['sid'] and gateway.heartbeat_callback:
-                        gateway._token = resp["token"]
-                        run_callback(self.discovery_service.loop, gateway.heartbeat_callback, resp)
-                return
-
-            elif cmd == "iam":
-                if resp["model"] not in GATEWAY_MODELS:
-                    _LOGGER.error("Gateway response to iam must be valid gateway model")
+                if cmd == 'heartbeat':
+                    _LOGGER.debug('Got heartbeat {!r} from {!r}'.format(data, addr))
+                    for gateway in self.discovery_service.gateways.values():
+                        if gateway.sid == resp['sid'] and gateway.heartbeat_callback:
+                            gateway._token = resp["token"]
+                            run_callback(self.discovery_service.loop, gateway.heartbeat_callback, resp)
                     return
 
-                _LOGGER.debug('Got iam {!r} from {!r}'.format(data, addr))
-                self.discovery_service._whois_queue.put_nowait(resp)
-                return
-            else:
-                _LOGGER.debug('Received {!r} from {!r}'.format(data, addr))
+                elif cmd == "iam":
+                    if resp["model"] not in GATEWAY_MODELS:
+                        _LOGGER.error("Gateway response to iam must be valid gateway model")
+                        return
 
-            for gateway in self.discovery_service.gateways.values():
-                if gateway.sid == resp['sid'] and gateway.device_callback:
-                    if "data" in resp:
-                        gateway.decode_data(resp)
-                if addr[0] == gateway.ip_adress:
-                    run_callback(self.discovery_service.loop, gateway.device_callback, resp)
+                    _LOGGER.debug('Got iam {!r} from {!r}'.format(data, addr))
+                    self.discovery_service._whois_queue.put_nowait(resp)
+                    return
+                else:
+                    _LOGGER.debug('Received {!r} from {!r}'.format(data, addr))
+
+                for gateway in self.discovery_service.gateways.values():
+                    if gateway.sid == resp['sid'] and gateway.device_callback:
+                        if "data" in resp:
+                            gateway.decode_data(resp)
+                    if addr[0] == gateway.ip_adress:
+                        run_callback(self.discovery_service.loop, gateway.device_callback, resp)
+        except Exception as e:
+            _LOGGER.error(e, exc_info=True, stack_info=True)
 
 class XiaomiService(object):
     def __init__(self, gateways_config=[], loop=asyncio.get_event_loop()):
