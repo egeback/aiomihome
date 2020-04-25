@@ -9,7 +9,7 @@ from asyncio import Queue
 from collections import defaultdict
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
-from .helpers import _list2map, encode_light_rgb, decode_light_rgb
+from .helpers import _list2map, encode_light_rgb, decode_light_rgb, is_int
 
 
 GATEWAY_DISCOVERY_PORT = 4321
@@ -337,7 +337,7 @@ def parse_data(value_key, value):
     """Parse data sent by gateway."""
     if value is None:
         return False
-    if value_key in ["coordination", "status", "proto", "proto_version"]:
+    if value_key in ["coordination", "status", "proto", "proto_version"] or not is_int(value):
         return value
     if value_key in ["alarm"]:
         return False if value == "0" else True

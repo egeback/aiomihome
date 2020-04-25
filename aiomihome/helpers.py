@@ -24,9 +24,19 @@ def encode_light_rgb(brightness, red, green, blue):
     return (brightness << 24) + (red << 16) + (green << 8) + blue
 
 def decode_light_rgb(c):
-    bri = (c>>24)&0xff;
-    r = (c>>16)&0xff;
-    g = (c>>8)&0xff;
-    b = c&0xff;
+    bri = (c>>24)&0xff
+    r = (c>>16)&0xff
+    g = (c>>8)&0xff
+    b = c&0xff
 
     return {"brightness": bri, "red": r, "green": g, "blue": b}
+
+def is_int(s):
+    if isinstance(s, int):
+        return True
+    elif isinstance(s, str):
+        if s[0] in ('-', '+'):
+            return s[1:].isdigit()
+        return s.isdigit()
+    
+    return False
