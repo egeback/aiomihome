@@ -81,6 +81,9 @@ class MiHomeGateway(object):
         _LOGGER.debug("Closing Gateway")
         self._transport.close()
         self._socket.close()
+    
+    async def play_sound(self, mid, volume):
+        await self.send_cmd(**{"mid": mid, "vol": volume})
 
     async def _discover_devices(self) -> None:
         command = '{"cmd" : "get_id_list"}'

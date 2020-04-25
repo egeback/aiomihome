@@ -80,7 +80,7 @@ class XiaomiService(object):
         else:
             return []
     
-    async def add_gateway(self, ip_address, port, sid, key, proto="1.1.2"):
+    async def add_gateway(self, ip_address, sid, key, port=9898, proto="1.1.2"):
         gateway = MiHomeGateway(ip_address, port, sid, key, proto)
         self.gateways[ip_address] = gateway
         await gateway.listen()
