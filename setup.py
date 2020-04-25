@@ -24,7 +24,12 @@ def my_test_suite():
     test_suite = test_loader.discover('tests', pattern='test_*.py')
     return test_suite
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setup(
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     name=PROJECT_PACKAGE_NAME,
     version=__version__,
     license=PROJECT_LICENSE,
