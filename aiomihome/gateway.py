@@ -137,15 +137,22 @@ class MiHomeGateway(object):
             for device_type in device_types:
                 if model in device_types[device_type]:
                     supported = True
+                    data = _list2map(_get_value(resp))
                     xiaomi_device = {
                         "model": model,
                         "proto": self.proto,
                         "sid": resp["sid"],
                         "short_id": resp["short_id"] if "short_id" in resp else 0,
-                        "data": _list2map(_get_value(resp)),
+                        "data": data,
                         "raw_data": resp}
                     self.devices[device_type].append(xiaomi_device)
                     _LOGGER.debug('Registering device %s, %s as: %s', sid, model, device_type)
+                    if model == "gateway":
+                        c = decode_light_rgb(data["rgb"])
+                        self.brightness = c["brightness"]
+                        self.rgb = data["rgb"]
+                        
+                        #self.brightness = data["brightness"]
 
             if not supported:
                 if model:
@@ -259,8 +266,9 @@ class MiHomeGateway(object):
         return ''.join('{:02x}'.format(x) for x in ciphertext)
 
     async def set_color(self, r, g, b, brightness=-1):
-        if brightness > 0:
-            await self.send_cmd(**{"rgb": encode_light_rgb(brightness, r, b , b)})
+        print(self.brightness)
+        if brightness >= 0:
+            await self.send_cmd(**{"rgb": encode_light_rgb(brightness, r, g , b)})
         else:
             await self.send_cmd(**{"rgb": encode_light_rgb(self.brightness, r, g , b)})
     
