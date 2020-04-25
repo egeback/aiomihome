@@ -337,10 +337,12 @@ def parse_data(value_key, value):
     """Parse data sent by gateway."""
     if value is None:
         return False
-    if value_key in ["coordination", "status", "proto", "proto_version"] or not is_int(value):
+    elif value_key in ["coordination", "status", "proto", "proto_version"] or not is_int(value):
         return value
-    if value_key in ["alarm"]:
+    elif value_key in ["alarm"]:
         return False if value == "0" else True
+    elif value_key in ["rgb"]:
+        return int(value)
     
     value = float(value)
     if value_key in ["temperature", "humidity", "pressure"]:
