@@ -9,7 +9,7 @@ from asyncio import Queue
 from collections import defaultdict
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
-from .helpers import _list2map, encode_light_rgb, decode_light_rgb, is_int
+from .helpers import list2map, encode_light_rgb, decode_light_rgb, is_int, get_value, validate_data, validate_keyerror
 
 
 GATEWAY_DISCOVERY_PORT = 4321
@@ -32,12 +32,12 @@ class MiHomeDeviceProtocol(asyncio.DatagramProtocol):
             self.gateway._queue.put_nowait(resp)
 
 class MiHomeGateway(object):
-    def __init__(self,address, port, sid, key, porto=None, loop=asyncio.get_event_loop(), host=None):
+    def __init__(self,address, port, sid, key, proto=None, loop=asyncio.get_event_loop(), host=None):
         self.ip_address = address
         self.port = port
         self.sid = sid
         self.key = key
-        self.proto = porto
+        self.proto = proto
         self._loop = loop
         self._queue = Queue()
         self._transport = None
@@ -53,6 +53,9 @@ class MiHomeGateway(object):
         self.color = -1
         self.illumination = -1
         self.rgb = -1
+    
+    def __del__(self):
+        self.close()
 
     async def listen(self) -> None:
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -67,7 +70,7 @@ class MiHomeGateway(object):
         if self.proto is None:
             cmd = '{"cmd":"read","sid":"' + self.sid + '"}'
             resp = await self._send_command(cmd)
-            self.proto = _get_value(resp, "proto_version") if _validate_data(resp) else None
+            self.proto = get_value(resp, "proto_version") if validate_data(resp) else None
 
         self.proto = '1.0' if self.proto is None else self.proto
 
@@ -127,7 +130,7 @@ class MiHomeGateway(object):
             cmd = '{"cmd":"read","sid":"' + sid + '"}'
             resp = await self._send_command(cmd, "read_ack")
 
-            if not _validate_data(resp):
+            if not validate_data(resp):
                 _LOGGER.error("Not a valid device. Check the mac adress and update the firmware.")
                 continue
 
@@ -140,7 +143,7 @@ class MiHomeGateway(object):
             for device_type in device_types:
                 if model in device_types[device_type]:
                     supported = True
-                    data = _list2map(_get_value(resp))
+                    data = list2map(get_value(resp))
                     xiaomi_device = {
                         "model": model,
                         "proto": self.proto,
@@ -189,6 +192,7 @@ class MiHomeGateway(object):
 
         except asyncio.TimeoutError:
             _LOGGER.error("No response from Gateway")
+            raise Exception("No response from Gateway")
         
         return None
     
@@ -216,9 +220,9 @@ class MiHomeGateway(object):
 
         resp = await self._send_command(json.dumps(cmd), "write_ack")
         _LOGGER.debug("write_ack << %s", resp)
-        if _validate_data(resp):
+        if validate_data(resp):
             return True
-        if not _validate_keyerror(resp):
+        if not validate_keyerror(resp):
             return False
 
         # If 'invalid key' message we ask for a new token
@@ -237,7 +241,7 @@ class MiHomeGateway(object):
         resp = await self._send_command(json.dumps(cmd), "write_ack")
 
         _LOGGER.debug("write_ack << %s", resp)
-        return _validate_data(resp)
+        return validate_data(resp)
     
     def get_data(self, sid):
         """Get data from gateway"""
@@ -248,7 +252,7 @@ class MiHomeGateway(object):
 
     def push_data(self, data):
         """Push data broadcasted from gateway to device"""
-        if not _validate_data(data):
+        if not validate_data(data):
             return False
         jdata = json.loads(data['data']) if int(self.proto[0:1]) == 1 else _list2map(data['params'])
         if jdata is None:
@@ -269,7 +273,6 @@ class MiHomeGateway(object):
         return ''.join('{:02x}'.format(x) for x in ciphertext)
 
     async def set_color(self, r, g, b, brightness=-1):
-        print(self.brightness)
         if brightness >= 0:
             await self.send_cmd(**{"rgb": encode_light_rgb(brightness, r, g , b)})
         else:
@@ -282,7 +285,7 @@ class MiHomeGateway(object):
         if isinstance(data, str):
             j_data = json.loads(data)
         elif isinstance(data, list):
-            j_data = _list2map(_get_value(data))
+            j_data = list2map(get_value(data))
         else:
             j_data = data
         
@@ -296,79 +299,6 @@ class MiHomeGateway(object):
         if "rgb" in j_data:
             self.rgb = j_data.get("rgb")
             c = decode_light_rgb(j_data.get("rgb"))
-            brightness = c["brightness"]
+            self.brightness = c["brightness"]
             del c["brightness"]
             self.color = c
-
-
-def _validate_data(data):
-    if data is None or ("data" not in data and "params" not in data):
-        _LOGGER.error('No data in response from hub %s', data)
-        return False
-    if "data" in data and 'error' in json.loads(data['data']):
-        _LOGGER.error("Got error element in data %s, full data: '%s'", data['data'], data)
-        return False
-    if "params" in data:
-        for param in data['params']:
-            if 'error' in param:
-                _LOGGER.error("Got error element in data %s, full data: '%s'", data['params'], data)
-                return False
-    return True
-
-
-def _validate_keyerror(data):
-    if data is not None and "data" in data and 'Invalid key' in data['data']:
-        return True
-    if data is not None and "params" in data:
-        for param in data['params']:
-            if 'error' in param and 'Invalid key' in param['error']:
-                return True
-    return False
-
-
-def _get_value(resp, data_key=None):
-    if not _validate_data(resp):
-        return None
-    data = json.loads(resp["data"]) if "data" in resp else resp["params"]
-    if data_key is None:
-        #if isinstance(data, dict):
-        #    new_data = {}
-        #    for key, value in data.items():
-        #        new_data[key] = parse_data(key, value)
-        #    return new_data
-        return data
-    if isinstance(data, list):
-        for param in data:
-            if data_key in param:
-                return param[data_key]
-        return None
-    return data.get(data_key)
-
-def parse_data(value_key, value):
-    """Parse data sent by gateway."""
-    if value is None:
-        return False
-    elif value_key in ["coordination", "status", "proto", "proto_version"] or not is_int(value):
-        return value
-    elif value_key in ["alarm"]:
-        return False if value == "0" else True
-    elif value_key in ["rgb"]:
-        return int(value)
-    
-    value = float(value)
-    if value_key in ["temperature", "humidity", "pressure"]:
-        value /= 100
-    elif value_key in ["illumination"]:
-        value = max(value - 300, 0)
-    if value_key == "temperature" and (value < -50 or value > 60):
-        return False
-    if value_key == "humidity" and (value <= 0 or value > 100):
-        return False
-    if value_key == "pressure" and value == 0:
-        return False
-    if value_key in ["illumination", "lux"]:
-        return round(value)
-    else:
-        return round(value, 1)
-    
-    return value
