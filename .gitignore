@@ -160,9 +160,9 @@ dmypy.json
 .pyre/
 
 # pytype static type analyzer
-.pytype/
+.pytype/w
 
 # Cython debug symbols
 cython_debug/
 
-
+test/gateway_config.json

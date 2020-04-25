@@ -11,7 +11,8 @@ sys.path.append("./aiomihome")
 
 
 from aiomihome.service import XiaomiService
-from aiomihome.gateway import MiHomeGateway, encode_light_rgb, parse_data, decode_light_rgb
+from aiomihome.gateway import MiHomeGateway
+from aiomihome.helpers import encode_light_rgb, parse_data, decode_light_rgb
 
 
 async def heartbeat_callback(data):
