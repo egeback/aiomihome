@@ -58,7 +58,7 @@ class MiHomeServerProtocol(asyncio.DatagramProtocol):
                     if gateway.sid == resp['sid'] and gateway.device_callback:
                         if "data" in resp:
                             gateway.decode_data(resp)
-                    if addr[0] == gateway.ip_adress:
+                    if addr[0] == gateway.ip_address:
                         run_callback(self.discovery_service.loop, gateway.device_callback, resp)
         except Exception as e:
             _LOGGER.error(e, exc_info=True, stack_info=True)
@@ -147,7 +147,7 @@ class XiaomiService(object):
 
                 if disabled:
                     _LOGGER.info("Xiaomi Gateway %s is disabled by configuration", sid)
-                    self.disabled_gateways.append(gateway.ip_adress)
+                    self.disabled_gateways.append(gateway.ip_address)
                 else:
                     _LOGGER.info('Xiaomi Gateway %s found at IP %s', gateway.sid, gateway.ip_address)
                     self.gateways[gateway.ip_address] = gateway
@@ -181,6 +181,10 @@ class XiaomiService(object):
     
     async def listen(self) -> None:
         _LOGGER.debug("Listen to multicast")
+
+        if self._multicast_socket:
+            self._transport.close()
+            self._multicast_socket.close()
         
         self._multicast_socket = self._create_multcast_socket()
         listen = self.loop.create_datagram_endpoint(

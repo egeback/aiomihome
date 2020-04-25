@@ -25,6 +25,7 @@ async def start(key):
     service = XiaomiService(gateways_config=[{"host": "10.0.4.104", "port": 9898, "key": key}])
     #service = XiaomiService(gateways_config=[{"key": key}])
     await service.listen()
+    await service.listen()
     
     gateways = await service.discover()
     gateway = gateways[0]
@@ -41,6 +42,7 @@ async def start(key):
             print(device_type, len(devices))
             for device in devices:
                 print("     ", device['model'])
+                print(device)
                 for value_key, value in device['data'].items():
                     print("         ", value_key, value)
         #await gateway.send_cmd(**{"mid": 11, "vol": 50})
@@ -71,9 +73,9 @@ async def light_show(gateway):
 
 def main(key):
     loop = asyncio.get_event_loop()
-    #loop.set_debug(True)
+    # loop.set_debug(True)
     logging.basicConfig(level=logging.DEBUG)
-    #logging.basicConfig(level=logging.INFO)
+    # logging.basicConfig(level=logging.INFO)
     try:
         loop.run_until_complete(start(key))
         loop.run_forever()

@@ -320,11 +320,11 @@ def _get_value(resp, data_key=None):
         return None
     data = json.loads(resp["data"]) if "data" in resp else resp["params"]
     if data_key is None:
-        if isinstance(data, dict):
-            new_data = {}
-            for key, value in data.items():
-                new_data[key] = parse_data(key, value)
-            return new_data
+        #if isinstance(data, dict):
+        #    new_data = {}
+        #    for key, value in data.items():
+        #        new_data[key] = parse_data(key, value)
+        #    return new_data
         return data
     if isinstance(data, list):
         for param in data:
