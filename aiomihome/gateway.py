@@ -340,7 +340,7 @@ def parse_data(value_key, value):
     if value_key in ["coordination", "status", "proto", "proto_version"]:
         return value
     if value_key in ["alarm"]:
-        return False if value == 0 else True
+        return False if value == "0" else True
     
     value = float(value)
     if value_key in ["temperature", "humidity", "pressure"]:
