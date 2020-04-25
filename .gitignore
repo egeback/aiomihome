@@ -165,4 +165,4 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-test/gateway_config.json
+tests/gateway_config.json
