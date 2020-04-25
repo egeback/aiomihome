@@ -9,7 +9,7 @@ PROJECT_LICENSE = 'MIT'
 PROJECT_AUTHOR = 'Marky Egebäck'
 PROJECT_EMAIL = 'marky@egeback.se'
 PROJECT_URL = 'https://github.com/egeback/aiomihome'
-DOWNLOAD_URL = 'https://github.com/egeback/aiomihome/archive/master.zip'
+DOWNLOAD_URL = 'https://github.com/egeback/aiomihome/archive/v1.0.3.zip'
 PROJECT_DESCRIPTION = 'Python asyncio implementation of Xiaomi Aqara Hub API'
 PACKAGES = find_packages(exclude=['tests', 'tests.*'])
 
