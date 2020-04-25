@@ -129,7 +129,7 @@ class XiaomiService(object):
 
         try:
             while True:
-                gateway = await asyncio.wait_for(self._get_gateway(), 5)
+                gateway = await asyncio.wait_for(self._get_gateway(None), 5)
 
                 disabled = False
                 for gw in self._gateways_config:
@@ -164,11 +164,11 @@ class XiaomiService(object):
         _LOGGER.debug("Found %i gatways. %s", len(self.gateways), list(self.gateways.keys()))
         return [ v for v in self.gateways.values() ]
     
-    async def _get_gateway(self):
+    async def _get_gateway(self, key):
         try:
             result = await self._whois_queue.get()
 
-            return MiHomeGateway(result['ip'], int(result['port']), result['sid'], result["proto_version"] if "proto_version" in result else None, self.loop)
+            return MiHomeGateway(result['ip'], int(result['port']), result['sid'], key, proto=result["proto_version"] if "proto_version" in result else None, loop=self.loop)
         except asyncio.CancelledError:
             pass
     
@@ -176,8 +176,11 @@ class XiaomiService(object):
         _LOGGER.debug("Closing socket")
         for gateway in self.gateways.values():
             gateway.close()
-        self._transport.close()
-        self._multicast_socket.close()
+
+        if self._transport:
+            self._transport.close()
+        if self._multicast_socket:
+            self._multicast_socket.close() 
     
     async def listen(self) -> None:
         _LOGGER.debug("Listen to multicast")
