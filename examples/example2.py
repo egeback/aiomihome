@@ -20,11 +20,14 @@ async def heartbeat_callback(data):
 async def device_callback(data):
     print("Device data RECIVED", data)
 
+global service
+service = None
+
 async def start(key):
+    global service
     # service = XiaomiService(gateways_config=[{"host": "10.0.4.104", "sid": "7811dcb07917", "port": 9898, "key": key}])
     service = XiaomiService(gateways_config=[{"host": "10.0.4.104", "port": 9898, "key": key}])
     #service = XiaomiService(gateways_config=[{"key": key}])
-    await service.listen()
     await service.listen()
     
     gateways = await service.discover()
@@ -57,6 +60,9 @@ async def start(key):
     except Exception:
         traceback.print_exc(file=sys.stdout)
 
+async def close():
+    await service.close()
+
 async def light_show(gateway):
         await gateway.send_cmd(**{"rgb": 820904191})
         await asyncio.sleep(1)
@@ -79,9 +85,11 @@ def main(key):
     try:
         loop.run_until_complete(start(key))
         loop.run_forever()
-        loop.close()
     except KeyboardInterrupt:
         pass
+    
+    loop.run_until_complete(close())
+    loop.close()
 
 if __name__ == '__main__':
     sys.argv[0] = re.sub(r'(-script\.pyw|\.exe)?$', '', sys.argv[0])
