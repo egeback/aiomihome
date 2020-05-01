@@ -54,8 +54,8 @@ class MiHomeGateway(object):
         self.illumination = -1
         self.rgb = -1
     
-    def __del__(self):
-        self.close()
+    # def __del__(self):
+    #    self.close()
 
     async def listen(self) -> None:
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
