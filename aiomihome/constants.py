@@ -1,10 +1,6 @@
 MAJOR_VERSION = 1
 MINOR_VERSION = 0
-<<<<<<< HEAD
-PATCH_VERSION = '3'
-=======
 PATCH_VERSION = '4'
->>>>>>> 93c59264e31ad15122f9a20f4022e6a4e1a3ebee
 
 __short_version__ = "{}.{}".format(MAJOR_VERSION, MINOR_VERSION)
 __version__ = "{}.{}".format(__short_version__, PATCH_VERSION)
