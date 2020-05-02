@@ -9,7 +9,7 @@ PROJECT_LICENSE = 'MIT'
 PROJECT_AUTHOR = 'Marky Egebäck'
 PROJECT_EMAIL = 'marky@egeback.se'
 PROJECT_URL = 'https://github.com/egeback/aiomihome'
-DOWNLOAD_URL = 'https://github.com/egeback/aiomihome/archive/master.zip'
+DOWNLOAD_URL = 'https://github.com/egeback/aiomihome/archive/v1.0.3.zip'
 PROJECT_DESCRIPTION = 'Python asyncio implementation of Xiaomi Aqara Hub API'
 PACKAGES = find_packages(exclude=['tests', 'tests.*'])
 
@@ -24,7 +24,12 @@ def my_test_suite():
     test_suite = test_loader.discover('tests', pattern='test_*.py')
     return test_suite
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setup(
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     name=PROJECT_PACKAGE_NAME,
     version=__version__,
     license=PROJECT_LICENSE,
